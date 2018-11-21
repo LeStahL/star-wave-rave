@@ -86,6 +86,29 @@ float lineseg(vec2 x, vec2 p1, vec2 p2)
     return length(x-mix(p1, p2, clamp(dot(x-p1, d)/dot(d,d),0.,1.)));
 }
 
+// Distance to circle
+float circle(vec2 x, float r)
+{
+    return length(x)-r;
+}
+
+// Distance to circle segment
+float circlesegment(vec2 x, float r, float p0, float p1)
+{
+    float p = atan(x.y, x.x);
+    p = clamp(p, p0, p1);
+    return length(x-r*vec2(cos(p), sin(p)));
+}
+
+// Distance to 210 logo
+float logo(vec2 x, float r)
+{
+    return min(
+        min(circle(x+r*c.zy, r), lineseg(x,r*c.yz, r*c.yx)),
+        circlesegment(x+r*c.xy, r, -.5*pi, .5*pi)
+    );
+}
+
 // Distance to stroke for any object
 float stroke(float d, float w)
 {
@@ -323,7 +346,7 @@ float dglyphpts(vec2 x, int ascii)
     for(float i=0.; i<npts; i+=1.)
     {
         vec2 xa = ( vec2(rshort(xoff+i), rshort(yoff+i)) + dx )/65536.*size;
-        d = min(d, length(x-xa)-3.e-3);
+        d = min(d, length(x-xa)-2.e-3);
     }
     
     return d;
@@ -336,18 +359,21 @@ mat2 rot(float t)
     return mat2(sc*c.xz, sc.yx);
 }
 
+float blend(float tstart, float tend)
+{
+    return smoothstep(tstart-.5, tstart + .5, iTime)*(1.-smoothstep(tend-.5, tend+.5, iTime));
+}
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    // Normalized pixel coordinates (from 0 to 1)
     vec2 uv = fragCoord/iResolution.yy-.5;
-//     vec3 col = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4)); TODO: remove
     vec3 col = c.yyy;
     
-    // Scene 1: 2D; Greetings and vortex logo.
-    if(iTime < 1000.)
+    // Scene 1: 2D; Greet the party.
+    if(iTime < 6.)
     {
         vec4 sdf = vec4(1., col);
-        float d = 1., dc = 1.;
+        float d = 1., dc = 1., dca = 1.;
         
         vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
         
@@ -358,20 +384,39 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             int str[17] = int[17](72, 101, 108, 108, 111, 44, 32, 86, 111, 114, 116, 101, 120, 32, 73, 73, 73);
             for(int i=0; i<17; ++i)
             {
-                d = min(d, dglyph(uv-carriage-vn, str[i]));
-                dc = min(dc, dglyphpts(uv-carriage-vn, str[i]));
-                carriage += glyphsize.x*c.xy + .01*c.xy;
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
             }
         }
-        d = stroke(d, 2.e-3)+.1*length(vn);
+        d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
         sdf = add(sdf, vec4(dc, c.xyy));
         
-        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x);        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(1., 5.);        
     }
     
+    // Scene 2: 2D and 3D part. Vortex logo, first 2D then with perspective.
+    else if(iTime < 1000.)
+    {
+        // Relative time coordinate makes things easier
+        float t = iTime - 6.;
+        
+        
+    }
+
+    // Add trendy display scan lines
+    col = mix(clamp(col,c.yyy,c.xxx), c.xxx, smoothstep(1.5/iResolution.y, -1.5/iResolution.y, stroke(logo(uv-vec2(-.45,.45),.02),.005)));
+
     // Set the fragment color
-    fragColor = vec4(col, 1.);
+    fragColor = vec4(col, 1.);    
 }
 
 void main()
