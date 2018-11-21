@@ -52,6 +52,57 @@ vec3 rand3(vec3 x)
     return vec3(rand(x.x*c.xx),rand(x.y*c.xx),rand(x.z*c.xx));
 }
 
+mat3 rot(vec3 p)
+{
+    return mat3(c.xyyy, cos(p.x), sin(p.x), 0., -sin(p.x), cos(p.x))
+        *mat3(cos(p.y), 0., -sin(p.y), c.yxy, sin(p.y), 0., cos(p.y))
+        *mat3(cos(p.z), -sin(p.z), 0., sin(p.z), cos(p.z), c.yyyx);
+}
+
+/* compute voronoi distance and closest point.
+ * x: coordinate
+ * return value: vec3(distance, coordinate of control point)
+ */
+vec4 vor(vec3 x)
+{
+    vec3 y = floor(x);
+   	float ret = 10.;
+    
+    //find closest control point. ("In which cell am I?")
+    vec3 pf=c.yyy, p;
+    float df=100., d;
+    
+    for(int i=-1; i<=1; i+=1)
+        for(int j=-1; j<=1; j+=1)
+            for(int k=-1; k<=1; k+=1)
+            {
+                p = y + vec3(float(i), float(j), float(k));
+                p += rand3(p);
+
+                d = length(x-p);
+				
+                if(d < df)
+                {
+                    df = d;
+                    pf = p;
+                }
+            }
+    
+    //compute voronoi distance: minimum distance to any edge
+    for(int i=-1; i<=1; i+=1)
+        for(int j=-1; j<=1; j+=1)
+            for(int k=-1; k<=1; k+=1)
+            {
+                p = y + vec3(float(i), float(j), float(k));
+                p += rand3(p);
+
+                vec3 o = p - pf;
+                d = abs(.5-dot(x-pf, o)/length(o));
+                ret = min(ret, d);
+            }
+    return vec4(ret, pf);
+}
+
 /* compute voronoi distance and closest point.
  * x: coordinate
  * return value: vec3(distance, coordinate of control point)
@@ -528,6 +579,27 @@ vec2 scene2(vec3 x) // City scene
     return add(vec2(d, 1.), vec2(x.z, 2.));
 }
 
+vec2 scene3(vec3 x) // shattered sphere glass
+{
+    x = rot(.05*vec3(1.,2.,3.)*iTime+iNBeats*c.xxx)*x;
+    vec3 y = mod(x, 1.)-.5;
+    vec4 v = (length(y)-.5)*c.xxxx, w  = vor(2.*x-(.2+.1*iScale)*valuenoise(x.xy-2.-1.*iTime));
+    ind = v.gba+.1*w.gba;
+    float d = max(-stroke(.4*w.x,5.e-3+1.e-3*iScale), stroke(v.x,1.e-1));
+    d = max(-length(x)+1., d);
+    return vec2(abs(d)-.001, 1.);
+}
+
+vec2 scene4(vec3 x)
+{
+    x = rot(.05*vec3(1.,2.,3.)*iTime+iNBeats)*x;
+    vec4 v = vor(.5*x-(.1+.05*iScale)*valuenoise(x.xy-2.-1.*iTime)), w  = vor(2.*x-(.2+.1*iScale)*valuenoise(x.xy-2.-1.*iTime));
+    ind = v.gba+.1*w.gba;
+    float d = max(-stroke(.4*w.x,5.e-3+1.e-3*iScale), stroke(v.x,1.e-1));
+    //d = max(-length(x)+1., d);
+    return vec2(abs(d)-.001, 1.);
+}
+
 //performs raymarching
 //scene: name of the scene function
 //xc: 	 name of the coordinate variable
@@ -596,13 +668,6 @@ void camera1(out vec3 ro, out vec3 r, out vec3 u, out vec3 t)
     r = c.xyy;
     u = c.yxx;
     t = c.yxy;
-}
-
-mat3 rot(vec3 p)
-{
-    return mat3(c.xyyy, cos(p.x), sin(p.x), 0., -sin(p.x), cos(p.x))
-        *mat3(cos(p.y), 0., -sin(p.y), c.yxy, sin(p.y), 0., cos(p.y))
-        *mat3(cos(p.z), -sin(p.z), 0., sin(p.z), cos(p.z), c.yyyx);
 }
 
 vec3 synthcol(float scale, float phase)
@@ -955,7 +1020,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(63., 65., 1.);
     }
     
-    else if(iTime < 76)
+    else if(iTime < 76) // Reflecting voronoi city
     {
         vec3 ro, r, u, t, x, dir;
     	camerasetup(camera1, ro, r, u, t, uv, dir);
@@ -1008,6 +1073,70 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         //col = clamp((tanh(.7*col)), 0., 1.);
         //fog
         col = mix(col, c.yyy, tanh(2.e-1*(abs(x.y+x.z))));
+    }
+    
+    else if(iTime < 86) // Shattered sphere glass
+    {
+        vec3 ro = c.yyx, r = c.xyy, u = c.yxy, t = c.yxy+ uv.x*r + uv.y*u, x, dir = normalize(t-ro);
+        float d = 1.;
+        
+        bool hit;
+        vec2 s;
+        raymarch(scene3, x, ro, d, dir, s, 80, 1.e-4, hit);
+        if(hit == false)
+        {
+            post(col, uv);
+            fragColor = vec4(col, 1.);
+            return;
+        }
+    
+        vec3 n;
+        calcnormal(scene3, n, 5.e-3, x);
+        
+        vec3 l = x+c.xxx, re = normalize(reflect(-l,n)), v = normalize(x-ro);
+        vec3 c1 = stdcolor(uv+.5*ind.x+iNBeats), 
+                c2 = stdcolor(uv+.5*ind.y+iNBeats), 
+                c3 = stdcolor(uv+.5*ind.z+iNBeats);
+        float rev = abs(dot(re,v)), ln = abs(dot(l,n));
+        if(s.y == 1.)
+        {
+            col = .1*c1*vec3(1.,.3,.3) + .2*c1*vec3(1.,.3,.3)*ln + vec3(1.,1.,.1)*pow(rev,2.*(2.-1.5*clamp(iScale,0.,1.))) + 2.*c1*pow(rev, 8.)+3.*c1*pow(rev, 16.);
+            col = abs(col);
+        }
+        //portability
+        col = clamp(.33*col, 0., 1.);
+    }
+    
+    else if(iTime < 96) // Shattered hexagonal glass
+    {
+        vec3 ro = c.yyx, r = c.xyy, u = c.yxy, t = c.yxy+ uv.x*r + uv.y*u, x, dir = normalize(t-ro);
+        float d = 1.;
+        
+        bool hit;
+        vec2 s;
+        raymarch(scene4, x, ro, d, dir, s, 80, 1.e-4, hit);
+        if(hit == false)
+        {
+            post(col, uv);
+            fragColor = vec4(col, 1.);
+            return;
+        }
+    
+        vec3 n;
+        calcnormal(scene4, n, 5.e-3, x);
+        
+        vec3 l = x+c.xxx, re = normalize(reflect(-l,n)), v = normalize(x-ro);
+        vec3 c1 = stdcolor(uv+.5*ind.x+iNBeats), 
+                c2 = stdcolor(uv+.5*ind.y+iNBeats), 
+                c3 = stdcolor(uv+.5*ind.z+iNBeats);
+        float rev = abs(dot(re,v)), ln = abs(dot(l,n));
+        if(s.y == 1.)
+        {
+            col = .1*c1*vec3(1.,.3,.3) + .2*c1*vec3(1.,.3,.3)*ln + vec3(1.,1.,.1)*pow(rev,2.*(2.-1.5*clamp(iScale,0.,1.))) + 2.*c1*pow(rev, 8.)+3.*c1*pow(rev, 16.);
+            col = abs(col);
+        }
+        //portability
+        col = clamp(.33*col, 0., 1.);
     }
 
     // Post-process

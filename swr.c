@@ -309,11 +309,6 @@ int WINAPI demo(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, in
     
     // Set render timer to 60 fps
     UINT_PTR t = SetTimer(hwnd, 1, 1000./60., NULL);
-    
-    // Get start time for relative time sync
-    SYSTEMTIME st_start;
-    GetSystemTime(&st_start);
-    t_start = (float)st_start.wMinute*60.+(float)st_start.wSecond+(float)st_start.wMilliseconds/1000.;
 #else
 int main(int argc, char **args)
 {
@@ -513,6 +508,11 @@ int main(int argc, char **args)
     
     // Main loop
 #ifdef _MSC_VER
+    // Get start time for relative time sync
+    SYSTEMTIME st_start;
+    GetSystemTime(&st_start);
+    t_start = (float)st_start.wMinute*60.+(float)st_start.wSecond+(float)st_start.wMilliseconds/1000.;
+    
     MSG msg;
     while(GetMessage(&msg, NULL, 0, 0) > 0)
     {
