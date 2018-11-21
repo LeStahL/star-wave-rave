@@ -121,17 +121,29 @@ void debug(int shader_handle)
 }
 // TODO: remove above
 
-//Shader globals
+// Graphics shader globals
 // int w = 1366, h = 768,
 int w = 1920, h = 1080,
     gfx_handle, gfx_program, 
     time_location, resolution_location, 
-    font_texture_location, font_width_location;
+    font_texture_location, font_width_location,
+    sfx_program, sfx_blockoffset_location, 
+    sfx_samplerate_location, sfx_volumelocation;
     
 // Demo globals
-double t_start = 0., t_now = 0.;
+double t_start = 0., 
+    t_now = 0., 
+    t_end = 1000.; // TODO: set to sensible end
 unsigned int font_texture_handle;
 int font_texture_location, font_texture_width_location;
+
+// Music shader globals
+int sample_rate = 44100, channels = 2;
+double duration1 = 312.*.43; //3 min running time
+float *smusic1;
+int music1_size;
+#define texs 512
+int block_size = texs*texs;
 
 // Pure opengl drawing code, cross-platform
 void draw()
@@ -365,7 +377,84 @@ int main(int argc, char **args)
     
 #endif
     
-    // Load shader
+     // Load sfx shader
+#undef VAR_IBLOCKOFFSET
+#undef VAR_ISAMPLERATE
+#undef VAR_IVOLUME
+#include "sfx.h"
+#ifndef VAR_IVOLUME
+#define VAR_IVOLUME "iVolume"
+#ifndef VAR_ISAMPLERATE
+#define VAR_ISAMPLERATE "iSampleRate"
+#ifndef VAR_IBLOCKOFFSET
+#define VAR_IBLOCKOFFSET "iBlockOffset"
+    int sfx_size = strlen(sfx_frag),
+        sfx_handle = glCreateShader(GL_FRAGMENT_SHADER);
+    sfx_program = glCreateProgram();
+    glShaderSource(sfx_handle, 1, (GLchar **)&sfx_frag, &sfx_size);
+    glCompileShader(sfx_handle);
+    debug(sfx_handle);
+    printf("sfx_debugged");
+    glAttachShader(sfx_program, sfx_handle);
+    glLinkProgram(sfx_program);
+    glUseProgram(sfx_program);
+    sfx_samplerate_location = glGetUniformLocation(sfx_program, VAR_ISAMPLERATE);
+    sfx_blockoffset_location = glGetUniformLocation(sfx_program, VAR_IBLOCKOFFSET);
+    sfx_volumelocation = glGetUniformLocation(sfx_program, VAR_IVOLUME);
+#endif
+#endif
+#endif
+    
+    int nblocks1 = sample_rate*duration1/block_size+1;
+    music1_size = nblocks1*block_size; 
+    smusic1 = (float*)malloc(4*music1_size);
+    
+    unsigned int snd_framebuffer;
+    glGenFramebuffers(1, &snd_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, snd_framebuffer);
+    glPixelStorei(GL_PACK_ALIGNMENT,  4);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    
+    unsigned int snd_texture;
+    glGenTextures(1, &snd_texture);
+    glBindTexture(GL_TEXTURE_2D, snd_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0,GL_RGBA, texs, texs, 0, GL_RGBA, GL_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, snd_texture, 0);
+
+    // Render sfx
+    for(int i=0; i<nblocks1; ++i)
+    {
+        double tstart = (double)(i*block_size)/(double)sample_rate;
+        
+        glViewport(0,0,texs,texs);
+        
+        glUniform1f(sfx_volumelocation, 1.);
+        glUniform1f(sfx_samplerate_location, (float)sample_rate);
+        glUniform1f(sfx_blockoffset_location, (float)tstart);
+        
+        glBegin(GL_QUADS);
+        glVertex3f(-1,-1,0);
+        glVertex3f(-1,1,0);
+        glVertex3f(1,1,0);
+        glVertex3f(1,-1,0);
+        glEnd();
+
+        glFlush();
+
+        glReadPixels(0, 0, texs, texs, GL_RGBA, GL_BYTE, smusic1+i*block_size);
+    }
+    
+    // Reset everything for rendering gfx again
+    glViewport(0, 0, w, h);
+    glUseProgram(0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    // Load gfx shader
 #undef VAR_IRESOLUTION
 #undef VAR_ITIME
 #undef VAR_IFONT
@@ -409,7 +498,19 @@ int main(int argc, char **args)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, font_texture_size, font_texture_size, 0, GL_RGBA, GL_UNSIGNED_BYTE, font_texture);
-
+    
+    // Play sound
+#ifdef _MSC_VER
+    HWAVEOUT hWaveOut = 0;
+    int n_bits_per_sample = 16;
+	WAVEFORMATEX wfx = { WAVE_FORMAT_PCM, channels, sample_rate, sample_rate*channels*n_bits_per_sample/8, channels*n_bits_per_sample/8, n_bits_per_sample, 0 };
+	waveOutOpen(&hWaveOut, WAVE_MAPPER, &wfx, 0, 0, CALLBACK_NULL);
+	
+	WAVEHDR header = { smusic1, 4*music1_size, 0, 0, 0, 0, 0, 0 };
+	waveOutPrepareHeader(hWaveOut, &header, sizeof(WAVEHDR));
+	waveOutWrite(hWaveOut, &header, sizeof(WAVEHDR));
+#endif
+    
     // Main loop
 #ifdef _MSC_VER
     MSG msg;
