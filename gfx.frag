@@ -22,6 +22,8 @@ uniform float iTime;
 uniform vec2 iResolution;
 uniform sampler2D iFont;
 uniform float iFontWidth;
+uniform float iNBeats;
+uniform float iScale;
 
 // Global constants
 const vec3 c = vec3(1.,0.,-1.);
@@ -32,11 +34,65 @@ float size = 1.,
     dmin = 1.;
 vec2 carriage = c.yy, 
     glyphsize = c.yy;
+vec3 col = c.yyy;
 
 // Hash function
 float rand(vec2 x)
 {
     return fract(sin(dot(x-1. ,vec2(12.9898,78.233)))*43758.5453);
+}
+
+float rand(vec3 x)
+{
+    return fract(sin(dot(x-1. ,vec3(12.9898,78.233,33.1818)))*43758.5453);
+}
+
+vec3 rand3(vec3 x)
+{
+    return vec3(rand(x.x*c.xx),rand(x.y*c.xx),rand(x.z*c.xx));
+}
+
+/* compute voronoi distance and closest point.
+ * x: coordinate
+ * return value: vec3(distance, coordinate of control point)
+ */
+vec3 vor(vec2 x)
+{
+    vec2 y = floor(x);
+   	float ret = 1.;
+    
+    //find closest control point. ("In which cell am I?")
+    vec2 pf=c.yy, p;
+    float df=10., d;
+    
+    for(int i=-1; i<=1; i+=1)
+        for(int j=-1; j<=1; j+=1)
+        {
+            p = y + vec2(float(i), float(j));
+            p += vec2(rand(p), rand(p+1.));
+            
+            d = length(x-p);
+            
+            if(d < df)
+            {
+                df = d;
+                pf = p;
+            }
+        }
+    
+    //compute voronoi distance: minimum distance to any edge
+    for(int i=-1; i<=1; i+=1)
+        for(int j=-1; j<=1; j+=1)
+        {
+            p = y + vec2(float(i), float(j));
+            p += vec2(rand(p), rand(p+1.));
+            
+            vec2 o = p - pf;
+            d = length(.5*o-dot(x-pf, o)/dot(o,o)*o);
+            ret = min(ret, d);
+        }
+    
+    return vec3(ret, pf);
 }
 
 // 2D value noise
@@ -53,6 +109,34 @@ float valuenoise(vec2 x)
         mix(r01, r11, x.x),
         x.y
     );
+}
+
+// 3D value noise
+float valuenoise(vec3 x)
+{
+    vec3 y = floor(x);
+    x = fract(x);
+    float r000 = -1.+2.*rand(y),
+        r100 = -1.+2.*rand(y+c.xyy),
+        r010 = -1.+2.*rand(y+c.yxy),
+        r001 = -1.+2.*rand(y+c.yyx),
+        r110 = -1.+2.*rand(y+c.xxy),
+        r011 = -1.+2.*rand(y+c.yxx),
+        r101 = -1.+2.*rand(y+c.xyx),
+        r111 = -1.+2.*rand(y+c.xxx);
+    return 	mix(
+        		mix(
+            		mix(r000, r100, smoothstep(0.,1.,x.x)),
+                    mix(r010, r110, smoothstep(0.,1.,x.x)),
+                    smoothstep(0.,1.,x.y)
+                ),
+        		mix(
+                    mix(r001, r101, smoothstep(0.,1.,x.x)),
+                    mix(r011, r111, smoothstep(0.,1.,x.x)),
+                    smoothstep(0.,1.,x.y)
+                ),
+        		smoothstep(0.,1.,x.z));
+        
 }
 
 // Multi-frequency value noise
@@ -79,11 +163,41 @@ vec4 add(vec4 sdf, vec4 sda)
     );
 }
 
+// add object to scene
+vec2 add(vec2 sda, vec2 sdb)
+{
+    return mix(sda, sdb, step(sdb.x, sda.x));
+}
+
+// subtract object from scene
+vec2 sub(vec2 sda, vec2 sdb)
+{
+    return mix(-sda, sdb, step(sda.x, sdb.x));
+}
+
+// Add objects to scene with blending
+vec4 smoothadd(vec4 sdf, vec4 sda, float a)
+{
+    return vec4(
+        min(sdf.x, sda.x), 
+        mix(sda.gba, sdf.gba, smoothstep(-a*1.5/iResolution.y, a*1.5/iResolution.y, sda.x))
+    );
+}
+
 // Distance to line segment
 float lineseg(vec2 x, vec2 p1, vec2 p2)
 {
     vec2 d = p2-p1;
     return length(x-mix(p1, p2, clamp(dot(x-p1, d)/dot(d,d),0.,1.)));
+}
+
+// distance to spiral
+float dspiral(vec2 x, float a, float d)
+{
+    float p = atan(x.y, x.x),
+        n = floor((abs(length(x)-a*p)+d*p)/(2.*pi*a));
+    p += (n*2.+1.)*pi;
+    return -abs(length(x)-a*p)+d*p;
 }
 
 // Distance to circle
@@ -161,6 +275,13 @@ float spline2(vec2 p0, vec2 p1, vec2 p2, vec2 x)
             dist(p0,p1,p2,x,t.z)
         )
     );
+}
+
+// extrusion
+float zextrude(float z, float d2d, float h)
+{
+    vec2 d = abs(vec2(min(d2d, 0.),z))-h*c.yx;
+    return min(max(d.x,d.y),0.)+length(max(d,0.));
 }
 
 // Read short value from texture at index off
@@ -359,15 +480,174 @@ mat2 rot(float t)
     return mat2(sc*c.xz, sc.yx);
 }
 
-float blend(float tstart, float tend)
+float blend(float tstart, float tend, float dt)
 {
-    return smoothstep(tstart-.5, tstart + .5, iTime)*(1.-smoothstep(tend-.5, tend+.5, iTime));
+    return smoothstep(tstart-dt, tstart + dt, iTime)*(1.-smoothstep(tend-dt, tend+dt, iTime));
+}
+
+vec3 ind;
+vec2 scene(vec3 x) // Vortex scene
+{
+    x += iTime*c.yxy*1.e-1;
+    
+    vec2 dis = 12.*vec2((.1+.05*iScale)*valuenoise(x-2.-2.e-1*iTime),(.1+.05*iScale)*valuenoise(x.xy-5.-2.e-1*iTime));
+    float d = x.z - mfvaluenoise(x.xy-dis, 2., 40., .45+.2*clamp(3.*iScale, 0., 1.));
+    d = max(d, -.5*mfvaluenoise(x.xy-dis, 2., 10., .45+.2*clamp(3.*iScale,0., 1.)));
+   
+    float dr = .165;
+    vec3 y = mod(x, dr)-.5*dr;
+    float guard = -length(max(abs(y)-vec3(.5*dr*c.xx, .6),0.));
+    guard = abs(guard)+dr*.1;
+    d = min(d, guard);
+    
+    return vec2(d, 1.);
+}
+
+vec2 scene2(vec3 x) // City scene
+{
+    //displacement
+    vec2 dis = 12.*vec2((.1+.05*iScale)*valuenoise(x-2.-1.e-1*iTime),(.1+.05*iScale)*valuenoise(x.xy-5.-1.e-1*iTime));
+    
+    //city
+    vec3 v = vor(7.*x.xy-iNBeats-dis);
+//     float h = .3*clamp(iScale, 0., 1.)*valuenoise(v.yz+1.);
+    float h = .4*rand(v.yz+7.+iNBeats)+.2*valuenoise(v.yz+7.+iNBeats)*clamp(5.*iScale, 0., 1.)+.1*valuenoise(v.yz-.4*iTime);
+    float d = stroke(zextrude(x.z+.1-.2*x.y, stroke(v.x,.15+.15*clamp(3.*iScale, 0., 1.)), h),.1);
+
+    //artificial guards for artifacts
+    float dr = .065;
+    vec3 y = mod(x, dr)-.5*dr;
+    float guard = -length(max(abs(y)-vec3(.5*dr*c.xx, .6),0.));
+    guard = abs(guard)+dr*.1;
+    d = min(d, guard);
+    
+    //coloring
+    ind = vec3(v.yz, 0.);
+
+    //floor
+    return add(vec2(d, 1.), vec2(x.z, 2.));
+}
+
+//performs raymarching
+//scene: name of the scene function
+//xc: 	 name of the coordinate variable
+//ro:	 name of the ray origin variable
+//d:	 name of the distance variable
+//dir:	 name of the direction variable
+//s:	 name of the scenestruct variable
+//N:	 number of iterations used
+//eps:	 exit criterion
+//flag:  name of the flag to set if raymarching succeeded
+#define raymarch(scene, xc, ro, d, dir, s, N, eps, flag) \
+	flag = false;\
+	for(int i=0; i<N; ++i)\
+    {\
+        xc = ro + d*dir;\
+        s = scene(xc);\
+        if(s.x < eps)\
+        {\
+            flag = true;\
+            break;\
+        }\
+        d += s.x;\
+    }
+
+//computes normal with finite differences
+//scene: name of the scene function
+//n:	 name of the normal variable
+//eps:	 precision of the computation
+//xc:	 location of normal evaluation
+#define calcnormal(scene, n, eps, xc) \
+	{\
+        float ss = scene(xc).x;\
+        n = normalize(vec3(scene(xc+eps*c.xyy).xc-ss,\
+                           scene(xc+eps*c.yxy).xc-ss,\
+                           scene(xc+eps*c.yyx).xc-ss));\
+    }
+
+//camera setup
+//camera: camera function with camera(out vec3 ro, out vec3 r, out vec3 u, out vec3 t)
+//ro:	  name of the ray origin variable
+//r:	  name of the right variable
+//u:	  name of the up variable
+//t:	  name of the target variable
+//uv:	  fragment coordinate
+//dir:	  name of the dir variable
+#define camerasetup(camera, ro, r, u, t, uv, dir) \
+	{\
+        camera(ro, r, u, t);\
+        t += uv.x*r+uv.y*u;\
+        dir = normalize(t-ro);\
+    }
+
+//post processing: 210 logo and trendy display lines
+//col: output color
+//uv:  fragment coordinate
+#define post(color, uv) \
+	{\
+    	col = mix(clamp(col,c.yyy,c.xxx), c.xxx, smoothstep(1.5/iResolution.y, -1.5/iResolution.y, stroke(logo(uv-vec2(-.45,.45),.02),.005)));\
+    	col += vec3(0., 0.05, 0.1)*sin(uv.y*1050.+ 5.*iTime);\
+	}
+	
+//camera for scene 1
+void camera1(out vec3 ro, out vec3 r, out vec3 u, out vec3 t)
+{
+    ro = c.yyx;
+    r = c.xyy;
+    u = c.yxx;
+    t = c.yxy;
+}
+
+mat3 rot(vec3 p)
+{
+    return mat3(c.xyyy, cos(p.x), sin(p.x), 0., -sin(p.x), cos(p.x))
+        *mat3(cos(p.y), 0., -sin(p.y), c.yxy, sin(p.y), 0., cos(p.y))
+        *mat3(cos(p.z), -sin(p.z), 0., sin(p.z), cos(p.z), c.yyyx);
+}
+
+vec3 synthcol(float scale, float phase)
+{
+    vec3 c2 = vec3(207.,30.,102.)/255.,
+        c3 = vec3(245., 194., 87.)/255.;
+    mat3 r1 = rot((5.e-1*phase)*vec3(1.1,1.3,1.5));
+    return 
+        (
+            1.1*mix
+            (
+                -(cross(c2, r1*c2)),
+                -(r1*c2), 
+                scale
+            )
+        );
+}
+
+vec3 stdcolor(vec2 x)
+{
+	return 0.5 + 0.5*cos(iTime+x.xyx+vec3(0,2,4));
+}
+
+vec3 color(float rev, float ln, float index, vec2 uv, vec3 x)
+{
+    vec3 col = c.yyy;
+    if(index == 1.)
+    {
+   		vec3 c1 = stdcolor(x.xy+.5*rand(ind.xy+17.)+iNBeats), 
+        	c2 = stdcolor(x.xy+x.yz+x.zx+.5*rand(ind.xy+12.)+iNBeats+11.+uv), 
+            c3 = stdcolor(x.xy+x.yz+x.zx+.5*rand(ind.xy+15.)+iNBeats+23.+uv);
+		col = .1*c1*vec3(1.,1.,1.) + .2*c1*vec3(1.,1.,1.)*ln + vec3(1.,1.,1.)*pow(rev,2.*(2.-1.5*clamp(iScale,0.,1.))) + 2.*c1*pow(rev, 8.)+3.*c1*pow(rev, 16.);
+		col = clamp(.33*col, 0., 1.);
+        //col = abs(col);
+	}
+    else if(index == 2.)
+    {
+        return stdcolor(x.xy+.5*rand(ind.xy+17.)+iNBeats);
+    }
+    return col;
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = fragCoord/iResolution.yy-.5;
-    vec3 col = c.yyy;
     
     // Scene 1: 2D; Greet the party.
     if(iTime < 6.)
@@ -400,21 +680,339 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         sdf = add(sdf, vec4(dca, c.xxx));
         sdf = add(sdf, vec4(dc, c.xyy));
         
-        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(1., 5.);        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(1., 5., 1.);        
     }
     
-    // Scene 2: 2D and 3D part. Vortex logo, first 2D then with perspective.
-    else if(iTime < 1000.)
+    // Scene 2: Vortex logo and 210 logo.
+    else if(iTime < 11.)
     {
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3e1*uv-5.e-1*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
         // Relative time coordinate makes things easier
-        float t = iTime - 6.;
+        float t = iTime - 6.,
+            p = (-7.5+15.)*t,
+            k = cos(p), s = sin(p),
+            d = dspiral(mat2(k,s,-s,k)*(uv-vn), 5.e-3, 4.e-4);
+        vec4 sdf = vec4(1., col);
         
+        sdf = add(sdf, vec4(d, c.xyy));
+        sdf = add(sdf, vec4(stroke(d, 3.e-3), c.xxx));
         
+        d = stroke(logo(.6*uv-.25*c.xy-vn, .1), 4.e-2);
+        sdf = add(sdf, vec4(d, c.xyy));
+        sdf = add(sdf, vec4(stroke(d, 4.e-3), c.xxx));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(6., 10., 1.);
+    }
+    
+    // Scene 3: "Team210 came here from Germany to party with you!"
+    else if(iTime < 14.)
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        // "Team210 came here"
+        {
+            size = 1.54;
+            carriage = -.35*c.xy;
+            int str[17] = int[17](84, 101, 97, 109, 50, 49, 48, 32, 99, 97, 109, 101, 32, 104, 101, 114, 101);
+            for(int i=0; i<17; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(12., 13., .5);
+    }
+    else if(iTime < 16.)
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        // "to party with you"
+        {
+            size = 1.54;
+            carriage = -.3*c.xy;
+            int str[17] = int[17](116, 111, 32, 112, 97, 114, 116, 121, 32, 119, 105, 116, 104, 32, 121, 111, 117);
+            for(int i=0; i<17; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(14., 15., .5);
+    }
+    
+    // Scene 4: Vortex
+    else if(iTime < 50.)
+    {
+        //use raymarching in this scene
+    	vec3 ro, r, u, t, x, dir;
+    	camerasetup(camera1, ro, r, u, t, uv, dir);
+    	
+        float d = -(ro.z-1.)/dir.z;
+    
+        bool hit;
+        vec2 s;
+        raymarch(scene, x, ro, d, dir, s, 300, 1.e-4, hit);
+        if(hit == false)
+        {
+            post(col, uv);
+            fragColor = vec4(col, 1.);
+            return;
+        }
+    
+        vec3 n;
+        calcnormal(scene, n, 1.e-3, x);
+    
+        vec3 l = x+2.*c.yyx, re = normalize(reflect(-l,n)), v = normalize(x-ro);
+        float rev = abs(dot(re,v)), ln = abs(dot(l,n));
+        
+        col = color(rev, ln, s.y, uv, x);
+        
+        for(float i = .7; i >= .5; i -= .2)
+        {
+            //reflections
+            dir = normalize(reflect(dir, n));
+//             dir = normalize(refract(dir, n, i));
+            d = 5.e-1;
+            ro = x;
+            raymarch(scene, x, ro, d, dir, s, 300, 5.e-3, hit);
+            if(hit == false)
+            {
+                post(col, uv);
+                fragColor = vec4(col, 1.);
+                break;
+            }
+            calcnormal(scene, n, 1.e-3, x);
+            l = x+2.*c.yyx;
+            re = normalize(reflect(-l,n)); 
+            v = normalize(x-ro);
+            rev = abs(dot(re,v));
+            ln = abs(dot(l,n));
+
+            col = mix(col, color(rev, ln, s.y, uv, x), i);
+        }
+    }
+    
+    else if(iTime < 54.)
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        // "Code :: NR4 & QM"
+        {
+            size = 1.54;
+            carriage = -.3*c.xy;
+            int str[16] = int[16](67, 111, 100, 101, 32, 58, 58, 32, 78, 82, 52, 32, 38, 32, 81, 77);
+            for(int i=0; i<16; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(51., 53., 1.);
+    }
+    
+    else if(iTime < 58.)
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        // "GFX :: NR4 & AWE"
+        {
+            size = 1.54;
+            carriage = -.3*c.xy;
+            int str[16] = int[16](71, 70, 88, 32, 58, 58, 32, 78, 82, 52, 32, 38, 32, 65, 87, 69);
+            for(int i=0; i<16; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(55., 57., 1.);
+    }
+    
+    else if(iTime < 62.)
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        // "SFX :: QM"
+        {
+            size = 1.54;
+            carriage = -.1*c.xy;
+            int str[9] = int[9](83, 70, 88, 32, 58, 58, 32, 81, 77);
+            for(int i=0; i<9; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(59., 61., 1.);
+    }
+    
+    else if(iTime < 66.)
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        // "Feat. Le Mique"
+        {
+            size = 1.54;
+            carriage = -.15*c.xy;
+            int str[14] = int[14](70, 101, 97, 116, 46, 32, 76, 101, 32, 77, 105, 113, 117, 101);
+            for(int i=0; i<14; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(63., 65., 1.);
+    }
+    
+    else if(iTime < 76)
+    {
+        vec3 ro, r, u, t, x, dir;
+    	camerasetup(camera1, ro, r, u, t, uv, dir);
+    	
+        float d = -(ro.z-.5-.3*clamp(5.*iScale,0.,1.))/dir.z;
+    
+        bool hit;
+        vec2 s;
+        raymarch(scene2, x, ro, d, dir, s, 300, 1.e-4, hit);
+        if(hit == false)
+        {
+            post(col, uv);
+            fragColor = vec4(col, 1.);
+            return;
+        }
+    
+        vec3 n;
+        calcnormal(scene2, n, 1.e-3, x);
+    
+        vec3 l = x+2.*c.yyx, re = normalize(reflect(-l,n)), v = normalize(x-ro);
+        float rev = abs(dot(re,v)), ln = abs(dot(l,n));
+        
+        col = color(rev, ln, s.y, uv, x);
+        
+        for(float i = .7; i >= .3; i -= .2)
+        {
+            //reflections
+            dir = normalize(reflect(dir, n));
+            //dir = normalize(refract(dir, n, .8));
+            d = 5.e-3;
+            ro = x;
+            raymarch(scene2, x, ro, d, dir, s, 50, 5.e-4, hit);
+            if(hit == false)
+            {
+                post(col, uv);
+                fragColor = vec4(col, 1.);
+                break;
+            }
+            calcnormal(scene2, n, 1.e-3, x);
+            l = x+2.*c.yyx;
+            re = normalize(reflect(-l,n)); 
+            v = normalize(x-ro);
+            rev = abs(dot(re,v));
+            ln = abs(dot(l,n));
+
+            col = mix(col, color(rev, ln, s.y, uv, x), i);
+        }
+        
+        //Portability
+        //col = clamp((tanh(.7*col)), 0., 1.);
+        //fog
+        col = mix(col, c.yyy, tanh(2.e-1*(abs(x.y+x.z))));
     }
 
-    // Add trendy display scan lines
-    col = mix(clamp(col,c.yyy,c.xxx), c.xxx, smoothstep(1.5/iResolution.y, -1.5/iResolution.y, stroke(logo(uv-vec2(-.45,.45),.02),.005)));
-
+    // Post-process
+    post(col, uv);
+    
     // Set the fragment color
     fragColor = vec4(col, 1.);    
 }
