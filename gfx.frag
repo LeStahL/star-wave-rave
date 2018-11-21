@@ -710,6 +710,31 @@ vec3 color(float rev, float ln, float index, vec2 uv, vec3 x)
     return col;
 }
 
+// Add thickness effect to object
+vec4 thick(vec2 x, vec4 sdf, vec2 n)
+{
+    for(int i=1; i<6; ++i)
+		sdf = add(vec4(stroke(sdf.x*n.x*n.y*2.*valuenoise((3.+4.*iScale)*x-2.-1.*iTime-1.2), .01), 3.e-3/abs(sdf.x+.2*valuenoise(x-2.-1.*iTime))*stdcolor(x+c.xx*.3*float(i))), sdf); 
+    return sdf;
+}
+
+// Draw Geometry
+vec4 geometry(vec2 x)
+{
+    vec4 sdf = vec4(stroke(stroke(logo(x, .2), .06),.01), 2.5*stdcolor(x*1.7));
+    //for(int i=0; i<10; ++i)
+    //    sdf = add(sdf, vec4(stroke(circle(x-.5*vec2(valuenoise(x-2.-5.*iTime+2.*rand(float(i+3)*c.xx)), valuenoise(x-2.-5.*iTime+rand(float(i)*c.xx)))-.5*c.xy, .2+valuenoise(x-2.-5.*iTime+rand(float(i)*c.xx))),.01), 2.5*stdcolor(x+float(i)*.1)));
+    return sdf;
+}
+
+// Normal
+const float dx = 1.e-4;
+vec2 normal(vec2 x)
+{
+    float s = geometry(x).x;
+    return normalize(vec2(geometry(x+dx*c.xy).x-s, geometry(x+dx*c.yx).x-s));
+}
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = fragCoord/iResolution.yy-.5;
@@ -1020,7 +1045,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(63., 65., 1.);
     }
     
-    else if(iTime < 76) // Reflecting voronoi city
+    else if(iTime < 76.) // Reflecting voronoi city
     {
         vec3 ro, r, u, t, x, dir;
     	camerasetup(camera1, ro, r, u, t, uv, dir);
@@ -1075,7 +1100,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         col = mix(col, c.yyy, tanh(2.e-1*(abs(x.y+x.z))));
     }
     
-    else if(iTime < 86) // Shattered sphere glass
+    else if(iTime < 86.) // Shattered sphere glass
     {
         vec3 ro = c.yyx, r = c.xyy, u = c.yxy, t = c.yxy+ uv.x*r + uv.y*u, x, dir = normalize(t-ro);
         float d = 1.;
@@ -1107,7 +1132,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         col = clamp(.33*col, 0., 1.);
     }
     
-    else if(iTime < 96) // Shattered hexagonal glass
+    else if(iTime < 96.) // Shattered hexagonal glass
     {
         vec3 ro = c.yyx, r = c.xyy, u = c.yxy, t = c.yxy+ uv.x*r + uv.y*u, x, dir = normalize(t-ro);
         float d = 1.;
@@ -1138,7 +1163,122 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         //portability
         col = clamp(.33*col, 0., 1.);
     }
+    
+    // "Santa hats are tipped"
+    else if(iTime < 100.) 
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        {
+            size = 1.54;
+            carriage = -.45*c.xy;
+            int str[21] = int[21](83, 97, 110, 116, 97, 32, 104, 97, 116, 115, 32, 97, 114, 101, 32, 116, 105, 112, 112, 101, 100);
+            for(int i=0; i<21; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(97., 99., 1.);
+    }
+    
+    // "for Kewlers & MFX"
+    else if(iTime < 104.) 
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        {
+            size = 1.54;
+            carriage = -.35*c.xy;
+            int str[17] = int[17](70, 111, 114, 32, 75, 101, 119, 108, 101, 114, 115, 32, 38, 32, 77, 70, 88);
+            for(int i=0; i<17; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(101., 103., 1.);
+    }
 
+    // "Jumalauta & rgba"
+    else if(iTime < 108.) 
+    {
+        vec4 sdf = vec4(1., col);
+        float d = 1., dc = 1., dca = 1.;
+        
+        vec2 vn = 2.e-2*vec2(valuenoise(2.3*uv-2.*vec2(1.5,2.4)*iTime), valuenoise(1.7*uv-2.4*vec2(1.2,2.1)*iTime));
+        
+        {
+            size = 1.54;
+            carriage = -.35*c.xy;
+            int str[16] = int[16](74, 117, 109, 97, 108, 97, 117, 116, 97, 32, 38, 32, 114, 103, 98, 97);
+            for(int i=0; i<16; ++i)
+            {
+                if( (abs(uv.x) < 1.5) && (abs(uv.y) < .1) )
+                {
+                    vec2 bound = uv-carriage-vn+.05*c.yx;
+                    d = min(d, dglyph(bound, str[i]));
+                    float d0 = dglyphpts(bound, str[i]);
+                    dc = min(dc, d0);
+                    dca = min(dca, stroke(d0, 2.e-3));
+                    carriage += glyphsize.x*c.xy + .01*c.xy;
+                }
+            }
+        }
+        d = stroke(d, 2.4e-3)+.1*length(vn);
+        sdf = add(sdf, vec4(d, c.xxx));
+        sdf = add(sdf, vec4(dca, c.xxx));
+        sdf = add(sdf, vec4(dc, c.xyy));
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(105., 107., 1.);
+    }
+    
+    // Let's add a cool Team210 logo again.
+    else if(iTime < 118.) 
+    {
+        // Preprocessing
+        vec2 x = uv + .1*vec2(valuenoise(uv-5.*iTime), valuenoise(uv-2.-5.*iTime));
+        
+        // Normal scene
+        vec4 sdf = geometry(x);
+        vec2 n = normal(x);
+        
+        // Add potential effect
+        sdf = thick(x, sdf, n);
+        
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(111., 118., 1.);
+    }
+    
     // Post-process
     post(col, uv);
     
