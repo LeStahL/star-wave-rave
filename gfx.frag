@@ -796,7 +796,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     
     // Scene 3: "Team210 came here from Germany to party with you!"
-    else if(iTime < 14.)
+    else if(iTime < 15.)
     {
         vec4 sdf = vec4(1., col);
         float d = 1., dc = 1., dca = 1.;
@@ -826,9 +826,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         sdf = add(sdf, vec4(dca, c.xxx));
         sdf = add(sdf, vec4(dc, c.xyy));
         
-        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(12., 13., .5);
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(12., 14., 1.);
     }
-    else if(iTime < 16.)
+    else if(iTime < 19.)
     {
         vec4 sdf = vec4(1., col);
         float d = 1., dc = 1., dca = 1.;
@@ -858,7 +858,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         sdf = add(sdf, vec4(dca, c.xxx));
         sdf = add(sdf, vec4(dc, c.xyy));
         
-        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(14., 15., .5);
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(16., 18., 1.);
     }
     
     // Scene 4: Vortex
