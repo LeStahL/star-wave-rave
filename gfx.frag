@@ -539,7 +539,7 @@ float blend(float tstart, float tend, float dt)
 vec3 ind;
 vec2 scene(vec3 x) // Vortex scene
 {
-    x += iTime*c.yxy*1.e-1;
+    x += iTime*c.yxy*1.e-1-iNBeats*c.xxy;
     
     vec2 dis = 12.*vec2((.1+.05*iScale)*valuenoise(x-2.-2.e-1*iTime),(.1+.05*iScale)*valuenoise(x.xy-5.-2.e-1*iTime));
     float d = x.z - mfvaluenoise(x.xy-dis, 2., 40., .45+.2*clamp(3.*iScale, 0., 1.));
@@ -1022,7 +1022,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         // "Feat. Le Mique"
         {
             size = 1.54;
-            carriage = -.15*c.xy;
+            carriage = -.2*c.xy;
             int str[14] = int[14](70, 101, 97, 116, 46, 32, 76, 101, 32, 77, 105, 113, 117, 101);
             for(int i=0; i<14; ++i)
             {
