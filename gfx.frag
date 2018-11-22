@@ -1276,7 +1276,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         // Add potential effect
         sdf = thick(x, sdf, n);
         
-        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(111., 118., 1.);
+        col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(111., 126., 1.);
     }
     
     // Post-process

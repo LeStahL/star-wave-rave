@@ -826,7 +826,7 @@ const char *gfx_frag =
                                      "vec4 sdf=geometry(x);"
                                      "vec2 n=normal(x);"
                                      "sdf=thick(x,sdf,n);"
-                                     "col=sdf.yzw*smoothstep(1.5/iResolution.y,-1.5/iResolution.y,sdf.x)*blend(111.,118.,1.);"
+                                     "col=sdf.yzw*smoothstep(1.5/iResolution.y,-1.5/iResolution.y,sdf.x)*blend(111.,126.,1.);"
                                    "}"
    "post(col,uv);"
    "fragColor=vec4(col,1.);"
