@@ -72,6 +72,8 @@ void *malloc( unsigned int size )
 // TODO: remove
 #include <stdio.h>
 
+#include <math.h>
+
 // fonts
 // #include "Pacifico-Regular.h"
 #include "Kavoon-Regular.h"
@@ -128,14 +130,16 @@ int w = 1920, h = 1080,
     time_location, resolution_location, 
     font_texture_location, font_width_location,
     sfx_program, sfx_blockoffset_location, 
-    sfx_samplerate_location, sfx_volumelocation;
+    sfx_samplerate_location, sfx_volumelocation, 
+    scale_location, nbeats_location;
     
 // Demo globals
 double t_start = 0., 
     t_now = 0., 
-    t_end = 1000.; // TODO: set to sensible end
+    t_end = 180.; // TODO: set to sensible end
 unsigned int font_texture_handle;
 int font_texture_location, font_texture_width_location;
+float nbeats = 0., scale = 0., oldscale = 0., ooldscale = 0.;
 
 // Music shader globals
 int sample_rate = 44100, channels = 2;
@@ -145,11 +149,53 @@ int music1_size;
 #define texs 512
 int block_size = texs*texs;
 
-// Pure opengl drawing code, cross-platform
+// Pure opengl drawing code, essentially cross-platform
 void draw()
 {
+    // End demo when it is over
+    if(t_now-t_start > t_end)
+#ifdef _MSC_VER
+        ExitProcess(0);
+#else
+        exit(0)
+#endif
+        
+    // Compute scale and nbeats
+    ooldscale = oldscale;
+    oldscale = scale;
+    scale = 0.;
+        
+    // First determine index that matches the current time
+    int index = (t_now-t_start)*sample_rate,
+        window_length = 512;
+    index = min(index, 4*music1_size-1);
+    index = max(index, 0);
+    
+    for(int i=-window_length/2; i<window_length/2; ++i)
+    {
+        // Find sample index
+        int j = index + i;
+        j = max(j,0);
+        j = min(j,4*music1_size-1);
+        
+        // Compute FFT at position k
+        int k = 2;
+        float val = ((float)*(unsigned short*)(smusic1+j)-65536/4)/1024.;
+        scale += val*val;// * cos(2.*acos(-1.)*(float)(k*j)/(float)window_length);
+    }
+    
+    scale /= window_length/6.;
+//     printf("%le \n", scale);
+    scale = max(scale, 0.);
+    scale = min(scale, 1.);
+    
+    // Modify number of beats only when clamped
+    if(oldscale + ooldscale + scale == 3.) nbeats += 1.;
+    
     glUniform1i(font_texture_location, 0);
     glUniform1f(font_width_location, font_texture_size);
+    glUniform1f(scale_location, .3*(scale+oldscale+ooldscale));
+    glUniform1f(nbeats_location, nbeats);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, font_texture_handle);
@@ -378,11 +424,14 @@ int main(int argc, char **args)
 #undef VAR_IVOLUME
 #include "sfx.h"
 #ifndef VAR_IVOLUME
-#define VAR_IVOLUME "iVolume"
+    #define VAR_IVOLUME "iVolume"
+#endif
 #ifndef VAR_ISAMPLERATE
-#define VAR_ISAMPLERATE "iSampleRate"
+    #define VAR_ISAMPLERATE "iSampleRate"
+#endif
 #ifndef VAR_IBLOCKOFFSET
-#define VAR_IBLOCKOFFSET "iBlockOffset"
+    #define VAR_IBLOCKOFFSET "iBlockOffset"
+#endif
     int sfx_size = strlen(sfx_frag),
         sfx_handle = glCreateShader(GL_FRAGMENT_SHADER);
     sfx_program = glCreateProgram();
@@ -396,9 +445,6 @@ int main(int argc, char **args)
     sfx_samplerate_location = glGetUniformLocation(sfx_program, VAR_ISAMPLERATE);
     sfx_blockoffset_location = glGetUniformLocation(sfx_program, VAR_IBLOCKOFFSET);
     sfx_volumelocation = glGetUniformLocation(sfx_program, VAR_IVOLUME);
-#endif
-#endif
-#endif
     
     int nblocks1 = sample_rate*duration1/block_size+1;
     music1_size = nblocks1*block_size; 
@@ -467,6 +513,12 @@ int main(int argc, char **args)
 #ifndef VAR_IFONTWIDTH
     #define VAR_IFONTWIDTH "iFontWidth"
 #endif
+#ifndef VAR_ISCALE
+    #define VAR_ISCALE "iScale"
+#endif
+#ifndef VAR_INBEATS
+    #define VAR_INBEATS "iNBeats"
+#endif
     int gfx_size = strlen(gfx_frag),
         gfx_handle = glCreateShader(GL_FRAGMENT_SHADER);
     gfx_program = glCreateProgram();
@@ -480,6 +532,8 @@ int main(int argc, char **args)
     resolution_location = glGetUniformLocation(gfx_program, VAR_IRESOLUTION);
     font_texture_location = glGetUniformLocation(gfx_program, VAR_IFONT);
     font_width_location = glGetUniformLocation(gfx_program, VAR_IFONTWIDTH);
+    scale_location = glGetUniformLocation(gfx_program, VAR_ISCALE);
+    nbeats_location = glGetUniformLocation(gfx_program, VAR_INBEATS);
     
     glUseProgram(gfx_program);
     glViewport(0, 0, w, h);

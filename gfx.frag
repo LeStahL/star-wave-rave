@@ -767,8 +767,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(1., 5., 1.);        
     }
@@ -823,8 +823,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(12., 14., 1.);
     }
@@ -855,8 +855,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(16., 18., 1.);
     }
@@ -940,8 +940,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(51., 53., 1.);
     }
@@ -973,8 +973,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(55., 57., 1.);
     }
@@ -1006,8 +1006,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(59., 61., 1.);
     }
@@ -1039,8 +1039,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(63., 65., 1.);
     }
@@ -1191,8 +1191,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(97., 99., 1.);
     }
@@ -1224,8 +1224,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(101., 103., 1.);
     }
@@ -1257,8 +1257,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         d = stroke(d, 2.4e-3)+.1*length(vn);
         sdf = add(sdf, vec4(d, c.xxx));
-        sdf = add(sdf, vec4(dca, c.xxx));
-        sdf = add(sdf, vec4(dc, c.xyy));
+        sdf = add(sdf, vec4(dca, 2.*stdcolor(uv + iNBeats)));
+        sdf = add(sdf, vec4(dc, stdcolor(uv + iNBeats)));
         
         col = sdf.gba * smoothstep(1.5/iResolution.y, -1.5/iResolution.y, sdf.x) * blend(105., 107., 1.);
     }
