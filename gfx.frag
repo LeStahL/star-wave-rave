@@ -1054,7 +1054,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
         bool hit;
         vec2 s;
-        raymarch(scene2, x, ro, d, dir, s, 300, 1.e-4, hit);
+        raymarch(scene2, x, ro, d, dir, s, 250, 1.e-4, hit);
         if(hit == false)
         {
             post(col, uv);
@@ -1077,7 +1077,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
             //dir = normalize(refract(dir, n, .8));
             d = 5.e-3;
             ro = x;
-            raymarch(scene2, x, ro, d, dir, s, 50, 5.e-4, hit);
+            raymarch(scene2, x, ro, d, dir, s, 35, 5.e-4, hit);
             if(hit == false)
             {
                 post(col, uv);
@@ -1264,7 +1264,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     }
     
     // Let's add a cool Team210 logo again.
-    else if(iTime < 118.) 
+    else if(iTime < 128.) 
     {
         // Preprocessing
         vec2 x = uv + .1*vec2(valuenoise(uv-5.*iTime), valuenoise(uv-2.-5.*iTime));
