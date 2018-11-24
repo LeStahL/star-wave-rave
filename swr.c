@@ -468,6 +468,7 @@ int main(int argc, char **args)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, snd_texture, 0);
 
     // Render sfx
+    printf("nblocks: %d\n", nblocks1);
     for(int i=0; i<nblocks1; ++i)
     {
         double tstart = (double)(i*block_size)/(double)sample_rate;
@@ -488,6 +489,8 @@ int main(int argc, char **args)
         glFlush();
 
         glReadPixels(0, 0, texs, texs, GL_RGBA, GL_BYTE, smusic1+i*block_size);
+        
+        printf("Block: %d/%d\n", i, nblocks1);
     }
     
     // Reset everything for rendering gfx again
