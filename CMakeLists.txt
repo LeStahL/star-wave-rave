@@ -24,8 +24,8 @@ if(WIN32)
     find_program(KKRUNCHY_K7 kkrunchy_k7.exe HINTS ${PROJECT_BINARY_DIR})
     
     add_custom_target(minification
-        COMMAND ${SHADER_MINIFIER} --no-renaming --preserve-all-globals ${PROJECT_SOURCE_DIR}/gfx.frag -o ${PROJECT_SOURCE_DIR}/gfx.h
-        COMMAND ${SHADER_MINIFIER} --preserve-externals ${PROJECT_SOURCE_DIR}/sfx.frag -o ${PROJECT_SOURCE_DIR}/sfx.h
+        COMMAND ${SHADER_MINIFIER} "${PROJECT_SOURCE_DIR}/gfx.frag" -o "${PROJECT_SOURCE_DIR}/gfx.h"  --preserve-all-globals --no-renaming --preserve-externals
+        COMMAND ${SHADER_MINIFIER}  -o "${PROJECT_SOURCE_DIR}/sfx.h" "${PROJECT_SOURCE_DIR}/sfx.frag" --preserve-externals
     )
     
     add_definitions(/Gy /O1 /fp:fast /GR- /GS- /MT)

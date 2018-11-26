@@ -24,14 +24,15 @@ uniform float iBlockOffset;
 uniform float iSampleRate;
 uniform float iVolume;
 
-#define DEBUG_ONLY_DRUMS false
-#define DEBUG_ONLY_MELO  false
-#define DEBUG_ONLY_TRACK -1
+const bool DEBUG_ONLY_DRUMS = false;
+const bool DEBUG_ONLY_MELO = false;
+const int DEBUG_ONLY_TRACK = -1;
 
 // #define index(it, in) (track_sep[it]+in)
 // int index(int it, float )
 
-#define PI radians(180.)
+//#define PI radians(180.)
+const float PI = acos(-1.);
 float _sin(float a) { return sin(2. * PI * mod(a,1.)); }
 float _unisin(float a,float b) { return (.5*_sin(a) + .5*_sin((1.+b)*a)); }
 float _sq(float a) { return sign(2.*fract(a) - 1.); }
@@ -280,7 +281,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
         sound = _saw(t*f);
     }
 
-    if(Bsyn == 14) // test of mace-sq (matzeskuh)
+    else if(Bsyn == 14) // test of mace-sq (matzeskuh)
     {
         env *= env_ADSR(Bprog,Boff-Bon,0.1,1.,1.,0.5);
         
@@ -293,7 +294,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
         sound = clip(0.8*sound);
     }
 
-    if(Bsyn == 15) // can I manage some horns, some day?
+    else if(Bsyn == 15) // can I manage some horns, some day?
     {
         env *= env_ADSR(Bprog,Boff-Bon,.5,0.,0.2,0.);
         
@@ -310,7 +311,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
         sound = clip(0.8*sound);
     }
     
-    if(Bsyn == 16) // super saw pad
+    else if(Bsyn == 16) // super saw pad
     {
         env *= env_ADSR(Bprog,Boff-Bon,1.5,2.,0.2,0.8);
         
@@ -328,7 +329,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
         //sound = quanti(sound, 128.);
     }
 
-    if(Bsyn == 88) // TEST WHATEVER IS HERE
+    else if(Bsyn == 88) // TEST WHATEVER IS HERE
     {
         env *= env_ADSR(Bprog,Boff-Bon,.1,2.,0.8,0.);
                
@@ -340,7 +341,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
         sound += 0.4*_squ(quanti(t*0.505*f,2048.), 0.1 + 0.05*_sin(.25*Bproc));
     }
     
-    if(Bsyn == 81) // super saw... something. with filter key following
+    else if(Bsyn == 81) // super saw... something. with filter key following
     {
         env *= env_ADSR(Bprog,Boff-Bon,.01,.00,1.,0.0);
         
@@ -358,7 +359,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
     }
     
     
-    if(Bsyn == 17) // deftiges pad
+    else if(Bsyn == 17) // deftiges pad
     {
 //        env *= env_ADSR(Bprog,Boff-Bon,0.6,0.5,0.9,0.1); // war: 1.5, 2., 0.2, 1. oder so 
         env *= env_ADSR(Bproc,1.,0.1,0.5,0.9,0.01); // war: 1.5, 2., 0.2, 1. oder so 
@@ -376,7 +377,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
     }
 
     
-    if(Bsyn == 10) // Alright, this is not mellow, but wayne.
+    else if(Bsyn == 10) // Alright, this is not mellow, but wayne.
     {
         sound = _tri(2.*f*t) + _tri(0.999*2.*f*_t*(1.+0.0001*_sin(4.*_t)));
         
@@ -388,7 +389,7 @@ float distsin(float t, float B, float Bon, float Boff, int note, int Bsyn) //Bsy
         sound *= 0.2;
     }
     
-    if(Bsyn == 20)
+    else if(Bsyn == 20)
     {
         sound = QTRISQ(t, freqC1(note), 1024., 16, 0.2, 8. + 20.*smoothstep(0.,0.3,Bproc), 1.2, 0.2, 0.1)
               + QTRISQ(t, 2.*freqC1(note), 1024., 16, 0.4, 8. + 20.*smoothstep(0.,0.1,Bproc), 1.2, 0.2, 0.1);
@@ -715,7 +716,8 @@ int drum_index_upper = 11;
     r_sidechain = 1.;
     amt_drum = .5;
     
-    float snd = clamp((1.-amt_drum) * r_sidechain * r + amt_drum * d, -1., 1.);
+    float snd = clamp(mix(r_sidechain * r, d, amt_drum), -1.,1.);
+    //float snd = clamp((1.-amt_drum) * r_sidechain * r + amt_drum * d, -1., 1.);
   
     return snd;
 //    return sign(snd) * sqrt(abs(snd));
